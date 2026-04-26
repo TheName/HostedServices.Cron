@@ -25,7 +25,7 @@
     </ItemGroup>
 
     <ItemGroup>
-        <ProjectReference Include="..\..\src\HostedServices.Cron\HostedServices.Cron.csproj" />
+        <ProjectReference Include="../../src/HostedServices.Cron/HostedServices.Cron.csproj" />
     </ItemGroup>
 
 </Project>
