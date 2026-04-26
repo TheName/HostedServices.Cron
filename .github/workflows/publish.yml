@@ -20,10 +20,10 @@ jobs:
           dotnet-version: '10.0.x'
           
       - name: Test
-        run: dotnet test --configuration Release
+        run: dotnet test tests/**/*.csproj --configuration Release
 
       - name: Pack
-        run: dotnet pack -c Release -o out
+        run: dotnet pack src/HostedServices.Cron/HostedServices.Cron.csproj -c Release -o ./dist
 
       - name: Push to NuGet
-        run: dotnet nuget push out/*.nupkg --source https://api.nuget.org/v3/index.json --skip-duplicate
+        run: dotnet nuget push ./dist/*.nupkg --source https://api.nuget.org/v3/index.json --skip-duplicate
