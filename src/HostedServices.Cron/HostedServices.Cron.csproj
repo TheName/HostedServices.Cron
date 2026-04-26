@@ -16,7 +16,7 @@
         <RootNamespace>HostedServices.Cron</RootNamespace>
 
         <Title>HostedServices.Cron</Title>
-        <Description>Simple cron-based hosted services for .NET applications, built on top of IHostedService with minimal dependencies. Implement ICronJob, register with AddCronJobHostedService, and your job runs on the cron schedule you define.</Description>
+        <Description>Simple cron-based hosted services for .NET applications, built on top of IHostedService with minimal dependencies. Implement ICronJob, register with AddCronJobHostedService, and your job runs on the cron schedule you define. Supports standard 5-field and seconds-precision 6-field cron expressions.</Description>
         <Authors>Dawid Szmidka</Authors>
         <Copyright>Copyright (c) 2026 Dawid Szmidka</Copyright>
         <Version>1.0.0</Version>
@@ -35,7 +35,7 @@
         <PackageReleaseNotes>
             Initial release of HostedServices.Cron. Provides ICronJob, CronJobHostedService&lt;TCronJob&gt;,
             and the AddCronJobHostedService DI extension for scheduling recurring background work
-            in .NET applications using cron expressions.
+            in .NET applications using cron expressions (5-field standard or 6-field with seconds).
         </PackageReleaseNotes>
     </PropertyGroup>
 
@@ -46,12 +46,13 @@
 
     <ItemGroup>
         <PackageReference Include="Cronos" Version="0.12.0" />
-        <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="6.0.1" />
-        <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="6.0.4" />
+        <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="8.0.1" />
+        <PackageReference Include="Microsoft.Extensions.Logging.Abstractions" Version="8.0.3" />
+        <PackageReference Include="Microsoft.Bcl.TimeProvider" Version="8.0.1" />
     </ItemGroup>
 
     <ItemGroup>
-        <None Include="README.md" Pack="true" PackagePath="\" />
+        <None Include="../../README.md" Pack="true" PackagePath="\" />
     </ItemGroup>
 
 </Project>

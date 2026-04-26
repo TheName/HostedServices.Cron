@@ -20,6 +20,7 @@ namespace HostedServices.Cron
     public abstract class CronJobHostedService : BackgroundService
     {
         private readonly ILogger _logger;
+        private readonly TimeProvider _timeProvider;
         private readonly Lazy<CronExpression> _lazyCronExpression;
 
         /// <summary>Gets the cron expression string used to schedule executions.</summary>
@@ -38,13 +39,19 @@ namespace HostedServices.Cron
         /// Initialises a new instance of <see cref="CronJobHostedService"/>.
         /// </summary>
         /// <param name="logger">The logger used for diagnostic output.</param>
+        /// <param name="timeProvider">
+        /// The time provider used for scheduling. Pass <see cref="TimeProvider.System"/> for
+        /// real-time behaviour, or a test implementation (e.g. <c>FakeTimeProvider</c>) to
+        /// control time in tests.
+        /// </param>
         /// <exception cref="ArgumentNullException">
-        /// Thrown when <paramref name="logger"/> is <see langword="null"/>.
+        /// Thrown when <paramref name="logger"/> or <paramref name="timeProvider"/> is <see langword="null"/>.
         /// </exception>
-        protected CronJobHostedService(ILogger logger)
+        protected CronJobHostedService(ILogger logger, TimeProvider timeProvider)
         {
             _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-            _lazyCronExpression = new Lazy<CronExpression>(() => Cronos.CronExpression.Parse(CronExpression));
+            _timeProvider = timeProvider ?? throw new ArgumentNullException(nameof(timeProvider));
+            _lazyCronExpression = new Lazy<CronExpression>(() => ParseCronExpression(CronExpression));
         }
 
         /// <inheritdoc/>
@@ -56,7 +63,8 @@ namespace HostedServices.Cron
 
             while (!stoppingToken.IsCancellationRequested)
             {
-                var nextOccurrence = ParsedCronExpression.GetNextOccurrence(DateTime.UtcNow);
+                var now = _timeProvider.GetUtcNow().UtcDateTime;
+                var nextOccurrence = ParsedCronExpression.GetNextOccurrence(now);
                 if (!nextOccurrence.HasValue)
                 {
                     _logger.LogError(
@@ -73,7 +81,8 @@ namespace HostedServices.Cron
                     CronJobType,
                     nextOccurrence);
 
-                await Task.Delay(nextOccurrence.Value.Subtract(DateTime.UtcNow), stoppingToken).ConfigureAwait(false);
+                var delay = nextOccurrence.Value - now;
+                await DelayAsync(delay, stoppingToken).ConfigureAwait(false);
                 try
                 {
                     _logger.LogInformation("Starting CronJob of type {CronJobType}", CronJobType);
@@ -109,5 +118,21 @@ namespace HostedServices.Cron
         /// <param name="cancellationToken">A token to observe for application shutdown.</param>
         /// <returns>A <see cref="Task"/> representing the asynchronous operation.</returns>
         protected abstract Task CronJob(DateTime plannedExecutionTime, CancellationToken cancellationToken);
+
+        private Task DelayAsync(TimeSpan delay, CancellationToken cancellationToken)
+        {
+            if (delay <= TimeSpan.Zero)
+                return Task.CompletedTask;
+
+            return _timeProvider.Delay(delay, cancellationToken);
+        }
+
+        // Detects seconds-precision (6-field) vs standard (5-field) from the expression itself.
+        private static CronExpression ParseCronExpression(string expression)
+        {
+            var fieldCount = expression.Trim().Split(new[] { ' ' }, StringSplitOptions.RemoveEmptyEntries).Length;
+            var format = fieldCount == 6 ? CronFormat.IncludeSeconds : CronFormat.Standard;
+            return Cronos.CronExpression.Parse(expression, format);
+        }
     }
 }

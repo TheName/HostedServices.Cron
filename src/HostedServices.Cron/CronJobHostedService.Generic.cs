@@ -30,10 +30,21 @@ namespace HostedServices.Cron
         /// </summary>
         /// <param name="cronJob">The cron job instance to execute on schedule.</param>
         /// <param name="logger">The logger used for diagnostic output.</param>
+        /// <param name="timeProvider">
+        /// The time provider used for scheduling. <see cref="TimeProvider.System"/> is registered
+        /// automatically by
+        /// <see cref="Extensions.ServiceCollectionExtensions.AddCronJobHostedService{TCronJob}(Microsoft.Extensions.DependencyInjection.IServiceCollection)"/>
+        /// when no custom implementation is present in the container.
+        /// </param>
         /// <exception cref="ArgumentNullException">
-        /// Thrown when <paramref name="cronJob"/> or <paramref name="logger"/> is <see langword="null"/>.
+        /// Thrown when <paramref name="cronJob"/>, <paramref name="logger"/>, or
+        /// <paramref name="timeProvider"/> is <see langword="null"/>.
         /// </exception>
-        public CronJobHostedService(TCronJob cronJob, ILogger<CronJobHostedService<TCronJob>> logger) : base(logger)
+        public CronJobHostedService(
+            TCronJob cronJob,
+            ILogger<CronJobHostedService<TCronJob>> logger,
+            TimeProvider timeProvider)
+            : base(logger, timeProvider)
         {
             _cronJob = cronJob ?? throw new ArgumentNullException(nameof(cronJob));
         }

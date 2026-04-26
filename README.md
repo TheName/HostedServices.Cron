@@ -44,8 +44,8 @@ That's it. The job starts automatically with your application and runs according
 
 ## How it works
 
-- The cron expression on `ICronJob.CronExpression` is parsed once using the [Cronos](https://github.com/HangfireIO/Cronos) library.
-- A `BackgroundService` loop calculates the next occurrence, sleeps until that time, then calls `ICronJob.ExecuteAsync`.
+- The cron expression on `ICronJob.CronExpression` is parsed once using the [Cronos](https://github.com/HangfireIO/Cronos) library. The format (standard 5-field or seconds-precision 6-field) is detected automatically from the number of fields.
+- A `BackgroundService` loop calculates the next occurrence using `TimeProvider`, sleeps until that time, then calls `ICronJob.ExecuteAsync`.
 - **Exceptions are caught and logged** — the loop continues with the next occurrence so a single failure does not kill the service.
 - **Clean shutdown** — if the application stops while a job is executing, the resulting `OperationCanceledException` is logged at `Information` level (not `Error`) and the service exits cleanly.
 - All scheduled times are in **UTC**.
@@ -56,7 +56,7 @@ That's it. The job starts automatically with your application and runs according
 
 | Member | Description |
 |--------|-------------|
-| `string CronExpression { get; }` | Standard 5-field cron expression (e.g. `"*/5 * * * *"` for every 5 minutes). |
+| `string CronExpression { get; }` | 5-field standard or 6-field seconds-precision cron expression. Format is detected automatically. |
 | `Task ExecuteAsync(DateTime plannedExecutionTime, CancellationToken cancellationToken)` | Invoked at each scheduled occurrence. `plannedExecutionTime` is the UTC time the run was scheduled for. |
 
 ### `CronJobHostedService<TCronJob>`
@@ -70,11 +70,13 @@ IServiceCollection AddCronJobHostedService<TCronJob>(this IServiceCollection ser
     where TCronJob : class, ICronJob
 ```
 
-Registers `TCronJob` as a **singleton** and adds `CronJobHostedService<TCronJob>` as a hosted service.
+Registers `TCronJob` as a **singleton**, adds `CronJobHostedService<TCronJob>` as a hosted service, and ensures a `TimeProvider` singleton is present (defaults to `TimeProvider.System` if none has been registered).
 
 ## Cron expression format
 
-The library delegates expression parsing to [Cronos](https://github.com/HangfireIO/Cronos), which supports the standard 5-field format:
+The library delegates expression parsing to [Cronos](https://github.com/HangfireIO/Cronos). The format is detected automatically from the number of space-separated fields.
+
+### Standard 5-field
 
 ```
 ┌─ minute      (0–59)
@@ -94,6 +96,41 @@ The library delegates expression parsing to [Cronos](https://github.com/Hangfire
 | `0 8 * * 1` | Every Monday at 08:00 UTC |
 | `*/15 * * * *` | Every 15 minutes |
 | `0 0 1 * *` | First day of every month at midnight |
+
+### Seconds-precision 6-field
+
+Add a seconds field as the first field:
+
+```
+┌─ second      (0–59)
+│ ┌─ minute    (0–59)
+│ │ ┌─ hour    (0–23)
+│ │ │ ┌─ day of month (1–31)
+│ │ │ │ ┌─ month (1–12 or JAN–DEC)
+│ │ │ │ │ ┌─ day of week  (0–7)
+│ │ │ │ │ │
+* * * * * *
+```
+
+| Expression | Meaning |
+|------------|---------|
+| `*/30 * * * * *` | Every 30 seconds |
+| `0 * * * * *` | Every minute at second 0 |
+| `0 */5 * * * *` | Every 5 minutes at second 0 |
+
+## Testing with a custom `TimeProvider`
+
+`AddCronJobHostedService` registers `TimeProvider.System` only if no `TimeProvider` is already present in the container. To control time in tests, register a custom implementation first:
+
+```csharp
+// Using Microsoft.Extensions.TimeProvider.Testing
+var fakeTime = new FakeTimeProvider(startTime);
+services.AddSingleton<TimeProvider>(fakeTime);
+services.AddCronJobHostedService<MyJob>();
+
+// ...start the host, then advance time to trigger execution:
+fakeTime.Advance(TimeSpan.FromHours(1));
+```
 
 ## Target frameworks
 
