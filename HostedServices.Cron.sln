@@ -5,11 +5,11 @@ VisualStudioVersion = 17.0.31903.59
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "src", "src", "{A2F5E0A4-821D-48CA-82EA-D14A058BBCB9}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HostedServices.Cron", "src\HostedServices.Cron\HostedServices.Cron.csproj", "{8C87E82B-EB84-4327-BF5F-8075933B826E}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HostedServices.Cron", "src/HostedServices.Cron/HostedServices.Cron.csproj", "{8C87E82B-EB84-4327-BF5F-8075933B826E}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "tests", "tests", "{5CA59F1E-8BB4-4D70-91A9-C1F4B31C8059}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HostedServices.Cron.Tests", "tests\HostedServices.Cron.Tests\HostedServices.Cron.Tests.csproj", "{BE06FB4F-E313-4FFF-9713-0F733CC7E431}"
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "HostedServices.Cron.Tests", "tests/HostedServices.Cron.Tests/HostedServices.Cron.Tests.csproj", "{BE06FB4F-E313-4FFF-9713-0F733CC7E431}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
