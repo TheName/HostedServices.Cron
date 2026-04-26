@@ -11,9 +11,9 @@ namespace HostedServices.Cron
     /// Abstract base class for a <see cref="BackgroundService"/> that executes a job on a cron schedule.
     /// </summary>
     /// <remarks>
-    /// Subclasses must implement <see cref="CronExpression"/>, <see cref="CronJobType"/>, and
-    /// <see cref="CronJob"/>. For most cases, use the concrete
-    /// <see cref="CronJobHostedService{TCronJob}"/> together with
+    /// Subclasses must implement <see cref="CronExpression"/> and <see cref="CronJob"/>.
+    /// Optionally override <see cref="CronJobType"/> to control the type name used in diagnostic logs.
+    /// For most cases, use the concrete <see cref="CronJobHostedService{TCronJob}"/> together with
     /// <see cref="Extensions.ServiceCollectionExtensions.AddCronJobHostedService{TCronJob}(Microsoft.Extensions.DependencyInjection.IServiceCollection)"/>
     /// instead of deriving directly from this class.
     /// </remarks>
@@ -26,9 +26,11 @@ namespace HostedServices.Cron
         protected abstract string CronExpression { get; }
 
         /// <summary>
-        /// Gets the <see cref="Type"/> of the concrete cron job, used for diagnostic logging.
+        /// Gets the <see cref="Type"/> of the cron job, used for diagnostic logging.
+        /// Defaults to <see cref="object.GetType"/> of the current instance.
+        /// Override to return a more specific type (e.g. <c>typeof(TMyJob)</c>).
         /// </summary>
-        protected abstract Type CronJobType { get; }
+        protected virtual Type CronJobType => GetType();
 
         private CronExpression ParsedCronExpression => _lazyCronExpression.Value;
 
@@ -54,28 +56,35 @@ namespace HostedServices.Cron
 
             while (!stoppingToken.IsCancellationRequested)
             {
-                var nextOccurence = ParsedCronExpression.GetNextOccurrence(DateTime.UtcNow);
-                if (!nextOccurence.HasValue)
+                var nextOccurrence = ParsedCronExpression.GetNextOccurrence(DateTime.UtcNow);
+                if (!nextOccurrence.HasValue)
                 {
                     _logger.LogError(
-                        "Could not find next occurrences of the job; cron job type {CronJobType} and expression {CronExpression}",
+                        "Could not find next occurrence of the job; cron job type {CronJobType} and expression {CronExpression}",
                         CronJobType,
                         ParsedCronExpression);
 
-                    throw new Exception($"Could not find next occurrences of the job; cron job type {GetType()} and expression {CronExpression}");
+                    throw new InvalidOperationException(
+                        $"Could not find next occurrence of the job; cron job type {CronJobType} and expression {CronExpression}");
                 }
 
                 _logger.LogInformation(
-                    "CronJob of type {CronJobType} has next occurence at {NextOccurenceTime}",
+                    "CronJob of type {CronJobType} has next occurrence at {NextOccurrenceTime}",
                     CronJobType,
-                    nextOccurence);
+                    nextOccurrence);
 
-                await Task.Delay(nextOccurence.Value.Subtract(DateTime.UtcNow), stoppingToken).ConfigureAwait(false);
+                await Task.Delay(nextOccurrence.Value.Subtract(DateTime.UtcNow), stoppingToken).ConfigureAwait(false);
                 try
                 {
                     _logger.LogInformation("Starting CronJob of type {CronJobType}", CronJobType);
-                    await CronJob(nextOccurence.Value, stoppingToken).ConfigureAwait(false);
+                    await CronJob(nextOccurrence.Value, stoppingToken).ConfigureAwait(false);
                     _logger.LogInformation("CronJob of type {CronJobType} finished", CronJobType);
+                }
+                catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+                {
+                    _logger.LogInformation(
+                        "CronJob of type {CronJobType} was cancelled because the application is shutting down",
+                        CronJobType);
                 }
                 catch (Exception exception)
                 {
@@ -83,7 +92,7 @@ namespace HostedServices.Cron
                         exception,
                         "Execution of cron job of type {CronJobType} scheduled at {ScheduleTime} failed",
                         CronJobType,
-                        nextOccurence.Value);
+                        nextOccurrence.Value);
                 }
             }
 

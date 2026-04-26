@@ -47,7 +47,8 @@ That's it. The job starts automatically with your application and runs according
 - The cron expression on `ICronJob.CronExpression` is parsed once using the [Cronos](https://github.com/HangfireIO/Cronos) library.
 - A `BackgroundService` loop calculates the next occurrence, sleeps until that time, then calls `ICronJob.ExecuteAsync`.
 - **Exceptions are caught and logged** — the loop continues with the next occurrence so a single failure does not kill the service.
-- The service stops cleanly when the application shuts down via `CancellationToken`.
+- **Clean shutdown** — if the application stops while a job is executing, the resulting `OperationCanceledException` is logged at `Information` level (not `Error`) and the service exits cleanly.
+- All scheduled times are in **UTC**.
 
 ## API reference
 

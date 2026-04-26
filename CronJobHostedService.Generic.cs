@@ -19,7 +19,10 @@ namespace HostedServices.Cron
         /// <inheritdoc/>
         protected override string CronExpression => _cronJob.CronExpression;
 
-        /// <inheritdoc/>
+        /// <summary>
+        /// Returns <c>typeof(<typeparamref name="TCronJob"/>)</c> so that log messages identify
+        /// the job type rather than the hosting service type.
+        /// </summary>
         protected override Type CronJobType => typeof(TCronJob);
 
         /// <summary>

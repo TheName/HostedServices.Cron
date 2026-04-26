@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Linq;
 using System.Threading;
 using System.Threading.Tasks;
 using Microsoft.Extensions.Logging;
@@ -41,6 +42,38 @@ namespace HostedServices.Cron.Tests
 
             await service.StartAsync(CancellationToken.None);
             await service.StopAsync(CancellationToken.None);
+        }
+
+        [Fact]
+        public async Task StopAsync_DoesNotLogErrors()
+        {
+            var logger = new RecordingLogger<CronJobHostedService<FakeCronJob>>();
+            var cronJob = new FakeCronJob();
+            using var service = new CronJobHostedService<FakeCronJob>(cronJob, logger);
+
+            await service.StartAsync(CancellationToken.None);
+            await service.StopAsync(CancellationToken.None);
+
+            var errors = logger.Entries
+                .Where(e => e.Level is LogLevel.Error or LogLevel.Critical)
+                .ToList();
+            Assert.Empty(errors);
+        }
+
+        [Fact]
+        public async Task CronJob_WhenThrowsOperationCanceledException_PropagatesWithoutLogging()
+        {
+            // The protected CronJob method is a pure delegation layer — it has no logging of its
+            // own. The OperationCanceledException catch (with the Info log) lives one level up in
+            // the ExecuteAsync loop and is guarded by stoppingToken.IsCancellationRequested.
+            var cronJob = new FakeCronJob(onExecute: _ => throw new OperationCanceledException());
+            var logger = new RecordingLogger<CronJobHostedService<FakeCronJob>>();
+            var service = new TestableCronJobHostedService(cronJob, logger);
+
+            await Assert.ThrowsAsync<OperationCanceledException>(
+                () => service.InvokeCronJobAsync(DateTime.UtcNow, CancellationToken.None));
+
+            Assert.Empty(logger.Entries);
         }
 
         [Fact]
