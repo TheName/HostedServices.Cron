@@ -5,6 +5,19 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
+## [2.0.0] - 2026-04-28
+
+### Added
+
+- `ICronJob.RunOnStartup` — when `true`, the job fires once immediately in the background at host start-up, before the first scheduled cron tick, then continues on its normal schedule. The start-up run is non-blocking, uses the same execution path and error handling as a scheduled run, and honours application shutdown. Startup log messages include `(startup run)` to distinguish them from scheduled ticks.
+- `CronJobBase` — convenience abstract base class implementing `ICronJob` with `RunOnStartup` defaulting to `false`. Derive from it to avoid writing the property when start-up execution is not needed.
+- `CronJobHostedService` (abstract base) — new `protected virtual bool RunOnStartup` property.
+
+### Changed
+
+- **Breaking:** `ICronJob` now declares `bool RunOnStartup { get; }`. Existing implementations must add the property (return `false`, or extend `CronJobBase` which provides that default).
+- All `await` calls in the library now use `ConfigureAwait(false)`, following standard library best practice for .NET Framework and .NET Standard targets.
+
 ## [1.0.0] - 2026-04-26
 
 ### Added

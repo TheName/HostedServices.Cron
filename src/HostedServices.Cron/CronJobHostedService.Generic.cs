@@ -25,6 +25,9 @@ namespace HostedServices.Cron
         /// </summary>
         protected override Type CronJobType => typeof(TCronJob);
 
+        /// <inheritdoc/>
+        protected override bool RunOnStartup => _cronJob.RunOnStartup;
+
         /// <summary>
         /// Initialises a new instance of <see cref="CronJobHostedService{TCronJob}"/>.
         /// </summary>
@@ -52,7 +55,7 @@ namespace HostedServices.Cron
         /// <inheritdoc/>
         protected override async Task CronJob(DateTime plannedExecutionTime, CancellationToken cancellationToken)
         {
-            await _cronJob.ExecuteAsync(plannedExecutionTime, cancellationToken);
+            await _cronJob.ExecuteAsync(plannedExecutionTime, cancellationToken).ConfigureAwait(false);
         }
     }
 }

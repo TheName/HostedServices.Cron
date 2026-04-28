@@ -12,7 +12,8 @@ namespace HostedServices.Cron
     /// </summary>
     /// <remarks>
     /// Subclasses must implement <see cref="CronExpression"/> and <see cref="CronJob"/>.
-    /// Optionally override <see cref="CronJobType"/> to control the type name used in diagnostic logs.
+    /// Optionally override <see cref="CronJobType"/> to control the type name used in diagnostic logs,
+    /// or override <see cref="RunOnStartup"/> to fire once immediately during host start-up.
     /// For most cases, use the concrete <see cref="CronJobHostedService{TCronJob}"/> together with
     /// <see cref="Extensions.ServiceCollectionExtensions.AddCronJobHostedService{TCronJob}(Microsoft.Extensions.DependencyInjection.IServiceCollection)"/>
     /// instead of deriving directly from this class.
@@ -32,6 +33,13 @@ namespace HostedServices.Cron
         /// Override to return a more specific type (e.g. <c>typeof(TMyJob)</c>).
         /// </summary>
         protected virtual Type CronJobType => GetType();
+
+        /// <summary>
+        /// When <see langword="true"/>, fires the job once at the start of
+        /// <see cref="BackgroundService.ExecuteAsync"/> before the first scheduled tick.
+        /// Defaults to <see langword="false"/>.
+        /// </summary>
+        protected virtual bool RunOnStartup => false;
 
         private CronExpression ParsedCronExpression => _lazyCronExpression.Value;
 
@@ -61,6 +69,39 @@ namespace HostedServices.Cron
                 "CronJob (service) of type {CronJobType} registered",
                 CronJobType);
 
+            if (RunOnStartup)
+            {
+                // Yield so that StartAsync returns before any job code runs, keeping host
+                // start-up non-blocking even when the job's ExecuteAsync is synchronous.
+                await Task.Yield();
+
+                var startupTime = _timeProvider.GetUtcNow().UtcDateTime;
+                try
+                {
+                    _logger.LogInformation(
+                        "Starting CronJob of type {CronJobType} (startup run)",
+                        CronJobType);
+                    await CronJob(startupTime, stoppingToken).ConfigureAwait(false);
+                    _logger.LogInformation(
+                        "CronJob of type {CronJobType} finished (startup run)",
+                        CronJobType);
+                }
+                catch (OperationCanceledException) when (stoppingToken.IsCancellationRequested)
+                {
+                    _logger.LogInformation(
+                        "CronJob of type {CronJobType} startup run was cancelled because the application is shutting down",
+                        CronJobType);
+                }
+                catch (Exception exception)
+                {
+                    _logger.LogError(
+                        exception,
+                        "CronJob of type {CronJobType} startup run at {StartupTime} failed",
+                        CronJobType,
+                        startupTime);
+                }
+            }
+
             while (!stoppingToken.IsCancellationRequested)
             {
                 var now = _timeProvider.GetUtcNow().UtcDateTime;
@@ -83,6 +124,7 @@ namespace HostedServices.Cron
 
                 var delay = nextOccurrence.Value - now;
                 await DelayAsync(delay, stoppingToken).ConfigureAwait(false);
+
                 try
                 {
                     _logger.LogInformation("Starting CronJob of type {CronJobType}", CronJobType);
