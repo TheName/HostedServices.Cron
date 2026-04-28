@@ -13,17 +13,19 @@ dotnet add package TheName.HostedServices.Cron
 
 ## Quick start
 
-**1. Implement `ICronJob`:**
+**1. Implement `ICronJob` (or extend `CronJobBase`):**
 
 ```csharp
 using HostedServices.Cron;
 
-public class ReportJob : ICronJob
+// Extend CronJobBase to get RunOnStartup = false by default,
+// or implement ICronJob directly and supply all members yourself.
+public class ReportJob : CronJobBase
 {
     // Run at 08:00 every day
-    public string CronExpression => "0 8 * * *";
+    public override string CronExpression => "0 8 * * *";
 
-    public async Task ExecuteAsync(DateTime plannedExecutionTime, CancellationToken cancellationToken)
+    public override async Task ExecuteAsync(DateTime plannedExecutionTime, CancellationToken cancellationToken)
     {
         // your work here
         await GenerateReportAsync(cancellationToken);
@@ -50,6 +52,35 @@ That's it. The job starts automatically with your application and runs according
 - **Clean shutdown** — if the application stops while a job is executing, the resulting `OperationCanceledException` is logged at `Information` level (not `Error`) and the service exits cleanly.
 - All scheduled times are in **UTC**.
 
+## Running the job immediately on start-up
+
+Override `RunOnStartup` on the job class to fire once as soon as the host starts, then continue on the normal cron schedule:
+
+```csharp
+public class CatalogSyncJob : CronJobBase
+{
+    public override string CronExpression => "0 0 */12 * * *"; // every 12 h
+
+    // Fire immediately on start-up to backfill, then run on the cron schedule
+    public override bool RunOnStartup => true;
+
+    public override async Task ExecuteAsync(DateTime plannedExecutionTime, CancellationToken cancellationToken)
+    {
+        await SyncCatalogAsync(cancellationToken);
+    }
+}
+```
+
+Registration is unchanged:
+
+```csharp
+builder.Services.AddCronJobHostedService<CatalogSyncJob>();
+```
+
+The start-up run executes in the background — `IHost.StartAsync` returns promptly so HTTP listeners are not delayed. The first scheduled tick fires only after the start-up run completes, so there is no concurrent overlap between the two. Exceptions from the start-up run are logged at `Error` level with a `(startup run)` marker and the normal schedule continues. The run honours application shutdown: if the host stops mid-run the job's `CancellationToken` is cancelled.
+
+`RunOnStartup` defaults to `false` (via `CronJobBase`), so existing jobs require no changes.
+
 ## API reference
 
 ### `ICronJob`
@@ -57,7 +88,12 @@ That's it. The job starts automatically with your application and runs according
 | Member | Description |
 |--------|-------------|
 | `string CronExpression { get; }` | 5-field standard or 6-field seconds-precision cron expression. Format is detected automatically. |
-| `Task ExecuteAsync(DateTime plannedExecutionTime, CancellationToken cancellationToken)` | Invoked at each scheduled occurrence. `plannedExecutionTime` is the UTC time the run was scheduled for. |
+| `bool RunOnStartup { get; }` | When `true`, fires the job once immediately on host start-up before the first scheduled tick. |
+| `Task ExecuteAsync(DateTime plannedExecutionTime, CancellationToken cancellationToken)` | Invoked at each execution. `plannedExecutionTime` is the scheduled UTC time, or the UTC time of host start-up for a `RunOnStartup` execution. |
+
+### `CronJobBase`
+
+Abstract base class that implements `ICronJob` with `RunOnStartup` defaulting to `false`. Extend this instead of implementing `ICronJob` directly when you don't need a start-up run.
 
 ### `CronJobHostedService<TCronJob>`
 

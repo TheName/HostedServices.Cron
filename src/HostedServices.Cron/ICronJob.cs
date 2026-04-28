@@ -24,10 +24,31 @@ namespace HostedServices.Cron
         string CronExpression { get; }
 
         /// <summary>
+        /// When <see langword="true"/>, the job fires once immediately in the background at host
+        /// start-up — before the first scheduled cron tick — then continues on the normal schedule.
+        /// </summary>
+        /// <remarks>
+        /// <para>The start-up run is non-blocking: <c>IHost.StartAsync</c> returns promptly and the
+        /// run executes on a background thread.</para>
+        /// <para>The first scheduled tick fires only after the start-up run completes, so there is
+        /// no concurrent overlap between the two.</para>
+        /// <para>If the start-up run throws, the exception is logged at
+        /// <see cref="Microsoft.Extensions.Logging.LogLevel.Error"/> and the normal schedule
+        /// continues; the host is never crashed.</para>
+        /// <para>The run honours application shutdown: if the host stops while the run is in
+        /// progress the job's <see cref="System.Threading.CancellationToken"/> is cancelled and
+        /// <c>StopAsync</c> waits for the run to finish.</para>
+        /// <para>Return <see langword="false"/> (or inherit from <see cref="CronJobBase"/> which
+        /// defaults to <see langword="false"/>) to keep the existing schedule-only behaviour.</para>
+        /// </remarks>
+        bool RunOnStartup { get; }
+
+        /// <summary>
         /// Executes the job asynchronously.
         /// </summary>
         /// <param name="plannedExecutionTime">
-        /// The UTC time at which this execution was scheduled according to the cron expression.
+        /// The UTC time at which this execution was scheduled according to the cron expression,
+        /// or the UTC time of host start-up for a <see cref="RunOnStartup"/> execution.
         /// </param>
         /// <param name="cancellationToken">
         /// A <see cref="CancellationToken"/> that is cancelled when the application is shutting down.

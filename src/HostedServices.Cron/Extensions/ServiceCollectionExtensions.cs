@@ -21,14 +21,19 @@ namespace HostedServices.Cron.Extensions
         /// <param name="serviceCollection">The <see cref="IServiceCollection"/> to add services to.</param>
         /// <returns>The same <see cref="IServiceCollection"/> so that calls can be chained.</returns>
         /// <remarks>
+        /// Start-up behaviour (e.g. <see cref="ICronJob.RunOnStartup"/>) is configured on the job
+        /// class itself, not at registration time.
+        /// <para>
         /// To use a custom <see cref="TimeProvider"/> (e.g. for testing), register it before calling
         /// this method and the existing registration will not be overwritten:
         /// <code>
         /// services.AddSingleton&lt;TimeProvider&gt;(myFakeTimeProvider);
         /// services.AddCronJobHostedService&lt;MyJob&gt;();
         /// </code>
+        /// </para>
         /// </remarks>
-        public static IServiceCollection AddCronJobHostedService<TCronJob>(this IServiceCollection serviceCollection)
+        public static IServiceCollection AddCronJobHostedService<TCronJob>(
+            this IServiceCollection serviceCollection)
             where TCronJob : class, ICronJob
         {
             serviceCollection.TryAddSingleton(TimeProvider.System);
